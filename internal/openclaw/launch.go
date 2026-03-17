@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/hpp-io/hpphub-cli/internal/api"
@@ -14,7 +15,7 @@ import (
 )
 
 // Launch runs the full detect → login → configure → start flow
-func Launch(modelFlag string, configOnly bool) error {
+func Launch(modelFlag string, configOnly bool, hubURL string) error {
 	// Step 1: Detect OpenClaw
 	fmt.Println("Checking OpenClaw installation...")
 	version, err := detectOpenClaw()
@@ -39,6 +40,10 @@ func Launch(modelFlag string, configOnly bool) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
+	}
+
+	if hubURL != "" {
+		cfg.HubURL = hubURL
 	}
 
 	if !cfg.IsLoggedIn() {
@@ -129,13 +134,35 @@ func detectOpenClaw() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// installOpenClaw installs openclaw via npm
+// installOpenClaw installs openclaw using the official install script
+// The script handles Node.js detection and installation automatically
 func installOpenClaw() error {
 	fmt.Println("  Installing OpenClaw...")
-	cmd := exec.Command("npm", "install", "-g", "openclaw")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | bash")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	case "windows":
+		if isWSL() {
+			cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | bash")
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+		cmd := exec.Command("powershell", "-Command", "iwr -useb https://openclaw.ai/install.ps1 | iex")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	default:
+		return fmt.Errorf("automatic install not supported on %s.\n"+
+			"Install from https://docs.openclaw.ai/install and rerun hpphub launch openclaw", runtime.GOOS)
+	}
 }
 
 // runLogin performs the Device Code Flow login
@@ -288,6 +315,19 @@ func startOpenClaw() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// isWSL detects if running inside Windows Subsystem for Linux
+func isWSL() bool {
+	if runtime.GOOS != "linux" {
+		return false
+	}
+	data, err := os.ReadFile("/proc/version")
+	if err != nil {
+		return false
+	}
+	lower := strings.ToLower(string(data))
+	return strings.Contains(lower, "microsoft") || strings.Contains(lower, "wsl")
 }
 
 // promptYesNo asks a yes/no question

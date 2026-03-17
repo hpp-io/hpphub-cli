@@ -208,6 +208,7 @@ func modelsCmd() *cobra.Command {
 func launchCmd() *cobra.Command {
 	var model string
 	var configOnly bool
+	var hubURL string
 
 	cmd := &cobra.Command{
 		Use:   "launch <integration>",
@@ -218,7 +219,7 @@ func launchCmd() *cobra.Command {
 
 			switch integration {
 			case "openclaw":
-				return openclaw.Launch(model, configOnly)
+				return openclaw.Launch(model, configOnly, hubURL)
 			default:
 				return fmt.Errorf("unknown integration: %s\nAvailable: openclaw", integration)
 			}
@@ -227,6 +228,7 @@ func launchCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&model, "model", "", "Model to use (skip interactive selection)")
 	cmd.Flags().BoolVar(&configOnly, "config", false, "Configure only, don't start")
+	cmd.Flags().StringVar(&hubURL, "hub-url", "", "Hub URL (default: https://hub.hpp.io)")
 
 	return cmd
 }

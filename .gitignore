@@ -1,0 +1,16 @@
+# Binaries
+/hpphub
+/hpphub-*
+*.exe
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Config (local testing)
+config.json

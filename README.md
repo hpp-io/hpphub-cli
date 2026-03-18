@@ -18,6 +18,14 @@ curl -fsSL https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.sh |
 
 This detects your OS and architecture, downloads the latest binary from [GitHub Releases](https://github.com/hpp-io/hpphub-cli/releases), and installs it to `/usr/local/bin/hpphub`.
 
+### Windows (WSL2)
+
+OpenClaw requires WSL2 on Windows. Inside your WSL2 terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.sh | sudo bash
+```
+
 ### Build from source (Go 1.24+)
 
 ```bash

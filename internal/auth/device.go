@@ -20,14 +20,11 @@ type DeviceCodeResponse struct {
 }
 
 type TokenResponse struct {
-	AccessToken string `json:"access_token,omitempty"`
-	APIKey      string `json:"api_key,omitempty"`
-	BaseURL     string `json:"base_url,omitempty"`
-	Email       string `json:"email,omitempty"`
-	TokenType   string `json:"token_type,omitempty"`
-	ExpiresIn   int    `json:"expires_in,omitempty"`
-	Error       string `json:"error,omitempty"`
-	ErrorDesc   string `json:"error_description,omitempty"`
+	APIKey    string `json:"api_key,omitempty"`
+	BaseURL   string `json:"base_url,omitempty"`
+	Email     string `json:"email,omitempty"`
+	Error     string `json:"error,omitempty"`
+	ErrorDesc string `json:"error_description,omitempty"`
 }
 
 // RequestDeviceCode calls POST /auth/device/code

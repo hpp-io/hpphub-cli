@@ -191,7 +191,6 @@ func runLogin(cfg *config.Config) error {
 		return fmt.Errorf("authorization failed: %w", err)
 	}
 
-	cfg.Token = token.AccessToken
 	cfg.APIKey = token.APIKey
 	cfg.BaseURL = token.BaseURL
 	cfg.Email = token.Email
@@ -287,6 +286,16 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 	}
 	agents["defaults"] = defaults
 	clawConfig["agents"] = agents
+
+	// Ensure gateway.mode is set (required for gateway to start)
+	gateway, ok := clawConfig["gateway"].(map[string]interface{})
+	if !ok {
+		gateway = make(map[string]interface{})
+	}
+	if gateway["mode"] == nil {
+		gateway["mode"] = "local"
+		clawConfig["gateway"] = gateway
+	}
 
 	// Write config
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {

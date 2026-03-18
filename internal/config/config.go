@@ -7,7 +7,6 @@ import (
 )
 
 type Config struct {
-	Token   string `json:"token,omitempty"`
 	APIKey  string `json:"api_key,omitempty"`
 	BaseURL string `json:"base_url,omitempty"`
 	Email   string `json:"email,omitempty"`

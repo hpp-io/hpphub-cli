@@ -89,7 +89,6 @@ func loginCmd() *cobra.Command {
 			}
 
 			// Step 4: Save config
-			cfg.Token = token.AccessToken
 			cfg.APIKey = token.APIKey
 			cfg.BaseURL = token.BaseURL
 			cfg.Email = token.Email

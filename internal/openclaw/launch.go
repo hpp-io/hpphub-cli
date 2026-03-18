@@ -18,7 +18,7 @@ import (
 func Launch(modelFlag string, configOnly bool, hubURL string) error {
 	// Step 1: Detect OpenClaw
 	fmt.Println("Checking OpenClaw installation...")
-	version, err := detectOpenClaw()
+	version, err := DetectOpenClaw()
 	if err != nil {
 		fmt.Println("  ✗ OpenClaw not found")
 		fmt.Println()
@@ -29,7 +29,7 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 		if err := installOpenClaw(); err != nil {
 			return fmt.Errorf("installation failed: %w", err)
 		}
-		version, err = detectOpenClaw()
+		version, err = DetectOpenClaw()
 		if err != nil {
 			return fmt.Errorf("OpenClaw still not found after install")
 		}
@@ -126,7 +126,8 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 }
 
 // detectOpenClaw checks if openclaw is installed and returns version
-func detectOpenClaw() (string, error) {
+// DetectOpenClaw checks if openclaw is installed and returns version
+func DetectOpenClaw() (string, error) {
 	out, err := exec.Command("openclaw", "--version").Output()
 	if err != nil {
 		return "", err
@@ -337,6 +338,14 @@ func isWSL() bool {
 	}
 	lower := strings.ToLower(string(data))
 	return strings.Contains(lower, "microsoft") || strings.Contains(lower, "wsl")
+}
+
+// RunCommand runs an openclaw CLI command
+func RunCommand(args ...string) error {
+	cmd := exec.Command("openclaw", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // promptYesNo asks a yes/no question

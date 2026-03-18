@@ -77,6 +77,8 @@ A browser window opens to `hub.hpp.io`. Since you don't have an account:
 4. Enter the code shown in your terminal (e.g., `ABCD-1234`)
 5. Click **Authorize**
 
+![Authorize Device](https://github.com/user-attachments/assets/d7134077-5e1b-4cb9-b599-bca35dcd97f6)
+
 ```
   ✓ Logged in as you@example.com
   ✓ API key saved: ...xxxx

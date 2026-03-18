@@ -11,12 +11,16 @@ Like `ollama launch openclaw` connects OpenClaw to local models, `hpphub launch 
 ## Quick Start
 
 ```bash
-# Install (macOS/Linux)
-curl -fsSL https://hpp.io/install.sh | bash
+# Build from source (Go 1.24+ required)
+git clone https://github.com/hpp-io/hpphub-cli.git
+cd hpphub-cli
+go build -o hpphub ./cmd/hpphub/
 
 # Launch OpenClaw with HPP
-hpphub launch openclaw
+./hpphub launch openclaw
 ```
+
+> Binary releases and install script (`curl -fsSL https://hpp.io/install.sh | bash`) coming soon.
 
 The `launch` command handles everything automatically:
 
@@ -91,7 +95,7 @@ Credentials are stored in `~/.hpphub/config.json`.
 
 ## Build from Source
 
-Requires Go 1.22+.
+Requires Go 1.24+.
 
 ```bash
 git clone https://github.com/hpp-io/hpphub-cli.git

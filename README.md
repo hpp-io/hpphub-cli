@@ -41,7 +41,7 @@ go build -o hpphub ./cmd/hpphub/
 If you don't have an HPP Hub account yet, `hpphub` will guide you through the entire process:
 
 ```bash
-$ ./hpphub launch openclaw
+$ hpphub launch openclaw
 ```
 
 **Step 1 — OpenClaw Installation**
@@ -95,7 +95,7 @@ A browser window opens to `hub.hpp.io`. Since you don't have an account:
 Or skip with `--model`:
 
 ```bash
-./hpphub launch openclaw --model openai/gpt-5-mini
+hpphub launch openclaw --model openai/gpt-5-mini
 ```
 
 **Step 4 — Done**
@@ -110,7 +110,7 @@ You're all set! Send a message via Telegram, WhatsApp, or other connected channe
 ### For Existing Users (already have an HPP Hub account)
 
 ```bash
-$ ./hpphub launch openclaw
+$ hpphub launch openclaw
 ```
 
 The flow is the same, but faster — no sign-up needed:
@@ -134,6 +134,8 @@ hpphub logout                       # Log out
 hpphub whoami                       # Show current login status
 
 hpphub models                       # List available models with pricing
+
+hpphub setup telegram               # Set up Telegram bot connection
 ```
 
 ## Available Models
@@ -185,17 +187,6 @@ Works in all environments including WSL and SSH sessions.
 
 Credentials are stored in `~/.hpphub/config.json`.
 
-## Build from Source
-
-Requires Go 1.24+.
-
-```bash
-git clone https://github.com/hpp-io/hpphub-cli.git
-cd hpphub-cli
-go build -o hpphub ./cmd/hpphub/
-./hpphub --help
-```
-
 ## Configuration
 
 ### CLI config
@@ -234,23 +225,26 @@ Stored at `~/.hpphub/config.json` after login:
 
 ### Connect Telegram
 
-1. Open Telegram, search for **@BotFather**, and start a chat
-2. Send `/newbot` and follow the prompts to create a bot
-3. Copy the bot token (e.g., `123456789:ABCdefGHI...`)
-4. Configure OpenClaw:
-
 ```bash
-# Set bot token
-openclaw config set channels.telegram.botToken "YOUR_BOT_TOKEN"
+$ hpphub setup telegram
 
-# Allow your Telegram account (get your ID from @userinfobot in Telegram)
-openclaw config set channels.telegram.allowFrom '["YOUR_USER_ID"]'
+  To create a Telegram bot:
 
-# Restart gateway to apply
-openclaw gateway restart
+  1. Open Telegram and talk to @BotFather
+  2. Send /newbot and follow the steps
+  3. Copy the bot token
+
+  Paste your Telegram bot token: 123456789:ABCdefGHI...
+  ✓ Bot token saved
+
+  Your Telegram user ID (or press Enter to skip): 123456789
+  ✓ Access restricted to your account
+
+  ✓ Gateway restarted
+  ✓ Telegram bot connected!
 ```
 
-5. Send a message to your bot in Telegram — it should respond using HPP models
+Send a message to your bot in Telegram — it should respond using HPP models.
 
 ### Connect Other Channels
 

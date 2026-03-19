@@ -321,6 +321,16 @@ func validateOpenClawConfig() error {
 
 // startOpenClaw starts the openclaw gateway
 func startOpenClaw() error {
+	if runtime.GOOS == "windows" {
+		// Windows: run gateway in foreground (daemon not supported)
+		fmt.Println("  Starting gateway in foreground (press Ctrl+C to stop)...")
+		cmd := exec.Command("openclaw", "gateway")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	// macOS/Linux: start as daemon
 	cmd := exec.Command("openclaw", "gateway", "start")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

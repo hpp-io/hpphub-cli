@@ -6,6 +6,19 @@ $repo = "hpp-io/hpphub-cli"
 $installDir = "$env:LOCALAPPDATA\hpphub"
 $binaryName = "hpphub.exe"
 
+# Check Execution Policy
+$policy = Get-ExecutionPolicy -Scope CurrentUser
+if ($policy -eq "Restricted" -or $policy -eq "AllSigned") {
+    Write-Host ""
+    Write-Host "  PowerShell execution policy is '$policy'." -ForegroundColor Yellow
+    Write-Host "  hpphub requires 'RemoteSigned' or less restrictive." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Run this command first:" -ForegroundColor Cyan
+    Write-Host "    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned" -ForegroundColor White
+    Write-Host ""
+    exit 1
+}
+
 Write-Host "Fetching latest release..." -ForegroundColor Cyan
 
 try {
@@ -38,12 +51,12 @@ try {
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$installDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$userPath;$installDir", "User")
-    Write-Host "  Added $installDir to PATH (restart terminal to apply)" -ForegroundColor Yellow
+    Write-Host "  Added $installDir to PATH" -ForegroundColor Yellow
 }
 
 Write-Host ""
 Write-Host "  hpphub $tag installed to $outPath" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Get started (restart terminal first):" -ForegroundColor Cyan
+Write-Host "  Restart your terminal, then run:" -ForegroundColor Cyan
 Write-Host "    hpphub launch openclaw"
 Write-Host ""

@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 
 	"github.com/hpp-io/hpphub-cli/internal/api"
@@ -32,6 +34,7 @@ func newCLI() *cobra.Command {
 		modelsCmd(),
 		launchCmd(),
 		setupCmd(),
+		uninstallCmd(),
 	)
 
 	return root
@@ -296,11 +299,25 @@ func setupTelegram() error {
 	userID = strings.TrimSpace(userID)
 
 	if userID != "" {
-		allowFrom := fmt.Sprintf(`["%s"]`, userID)
-		if err := openclaw.RunCommand("config", "set", "channels.telegram.allowFrom", allowFrom); err != nil {
-			fmt.Printf("  ⚠ Failed to set allowFrom: %s\n", err)
+		// Validate: must be numeric
+		isNumeric := true
+		for _, c := range userID {
+			if c < '0' || c > '9' {
+				isNumeric = false
+				break
+			}
+		}
+		if !isNumeric {
+			fmt.Println("  ⚠ Telegram user ID must be a number (e.g., 8228669492)")
+			fmt.Println("    Get it from @userinfobot in Telegram")
+			fmt.Println("  Skipped — bot will use pairing mode")
 		} else {
-			fmt.Println("  ✓ Access restricted to your account")
+			allowFrom := fmt.Sprintf(`["%s"]`, userID)
+			if err := openclaw.RunCommand("config", "set", "channels.telegram.allowFrom", allowFrom); err != nil {
+				fmt.Printf("  ⚠ Failed to set allowFrom: %s\n", err)
+			} else {
+				fmt.Println("  ✓ Access restricted to your account")
+			}
 		}
 	} else {
 		fmt.Println("  ⚠ Skipped — bot will use pairing mode (new users need approval)")
@@ -327,4 +344,48 @@ func setupTelegram() error {
 	fmt.Println("  Send a message to your bot in Telegram to test it.")
 
 	return nil
+}
+
+// ─── uninstall ──────────────────────────────────────────────
+
+func uninstallCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "uninstall",
+		Short: "Remove hpphub CLI and its configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println()
+
+			// Step 1: Remove HPP provider from OpenClaw config
+			if _, err := openclaw.DetectOpenClaw(); err == nil {
+				fmt.Println("  Removing HPP provider from OpenClaw config...")
+				_ = openclaw.RunCommand("config", "unset", "models.providers.hpp")
+				fmt.Println("  ✓ HPP provider removed")
+			}
+
+			// Step 2: Remove hpphub config
+			configDir := config.Dir()
+			if _, err := os.Stat(configDir); err == nil {
+				if err := os.RemoveAll(configDir); err != nil {
+					fmt.Printf("  ⚠ Failed to remove %s: %s\n", configDir, err)
+				} else {
+					fmt.Printf("  ✓ Config removed (%s)\n", configDir)
+				}
+			}
+
+			// Step 3: Remove binary
+			exe, err := os.Executable()
+			if err == nil {
+				fmt.Printf("  To complete uninstall, remove the binary:\n")
+				if runtime.GOOS == "windows" {
+					fmt.Printf("    del \"%s\"\n", exe)
+				} else {
+					fmt.Printf("    sudo rm %s\n", exe)
+				}
+			}
+
+			fmt.Println()
+			fmt.Println("  ✓ hpphub uninstalled")
+			return nil
+		},
+	}
 }

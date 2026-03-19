@@ -24,11 +24,17 @@ This detects your OS and architecture, downloads the latest binary from [GitHub 
 irm https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.ps1 | iex
 ```
 
-Restart the terminal after installation for PATH to take effect.
+> **Note:** If you see an Execution Policy error, run this first:
+> ```powershell
+> Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+> ```
+> After installation, **restart the terminal** for PATH to take effect.
 
-### Windows (WSL2)
+On Windows, the OpenClaw gateway runs in foreground mode. Keep the terminal open while using Telegram/WhatsApp channels.
 
-If you prefer WSL2:
+### Windows (WSL2) — Recommended
+
+WSL2 provides the best experience on Windows (background gateway, full compatibility):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.sh | sudo bash
@@ -146,6 +152,8 @@ hpphub whoami                       # Show current login status
 hpphub models                       # List available models with pricing
 
 hpphub setup telegram               # Set up Telegram bot connection
+
+hpphub uninstall                    # Remove hpphub and its configuration
 ```
 
 ## Available Models

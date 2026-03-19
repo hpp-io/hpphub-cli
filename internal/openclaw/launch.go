@@ -49,7 +49,7 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 	if !cfg.IsLoggedIn() {
 		fmt.Println()
 		fmt.Println("Not logged in. Starting login flow...")
-		if err := runLogin(cfg); err != nil {
+		if err := RunLogin(cfg); err != nil {
 			return err
 		}
 		// Reload config after login
@@ -167,7 +167,8 @@ func installOpenClaw() error {
 }
 
 // runLogin performs the Device Code Flow login
-func runLogin(cfg *config.Config) error {
+// RunLogin performs the Device Code Flow login
+func RunLogin(cfg *config.Config) error {
 	hub := cfg.GetHubURL()
 
 	dc, err := auth.RequestDeviceCode(hub)

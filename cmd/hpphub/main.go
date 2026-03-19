@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -223,8 +225,10 @@ func launchCmd() *cobra.Command {
 			switch integration {
 			case "openclaw":
 				return openclaw.Launch(model, configOnly, hubURL)
+			case "claude":
+				return launchClaude(model, hubURL)
 			default:
-				return fmt.Errorf("unknown integration: %s\nAvailable: openclaw", integration)
+				return fmt.Errorf("unknown integration: %s\nAvailable: openclaw, claude", integration)
 			}
 		},
 	}
@@ -234,6 +238,133 @@ func launchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&hubURL, "hub-url", "", "Hub URL (default: https://hub.hpp.io)")
 
 	return cmd
+}
+
+// ─── launch claude ──────────────────────────────────────────
+
+func launchClaude(model string, hubURL string) error {
+	// Step 1: Check Claude Code
+	fmt.Println("Checking Claude Code installation...")
+	claudePath, err := findClaude()
+	if err != nil {
+		fmt.Println("  ✗ Claude Code not found")
+		fmt.Println()
+		if !promptYesNo("  Install Claude Code?") {
+			fmt.Println("  Install from https://code.claude.com/docs/en/quickstart")
+			return nil
+		}
+		if err := installClaude(); err != nil {
+			return fmt.Errorf("installation failed: %w", err)
+		}
+		claudePath, err = findClaude()
+		if err != nil {
+			return fmt.Errorf("Claude Code still not found after install")
+		}
+	}
+	fmt.Printf("  ✓ Claude Code detected (%s)\n", claudePath)
+
+	// Step 2: Login check
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if hubURL != "" {
+		cfg.HubURL = hubURL
+	}
+
+	if !cfg.IsLoggedIn() {
+		fmt.Println()
+		fmt.Println("Not logged in. Starting login flow...")
+		if err := openclaw.RunLogin(cfg); err != nil {
+			return err
+		}
+		cfg, err = config.Load()
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("  ✓ Logged in as %s\n", cfg.Email)
+	}
+
+	if cfg.APIKey != "" {
+		suffix := cfg.APIKey[len(cfg.APIKey)-4:]
+		fmt.Printf("  ✓ API key: ...%s\n", suffix)
+	}
+
+	// Step 3: Set model
+	if model == "" {
+		model = "claude-sonnet-4-6"
+	}
+	// Strip anthropic/ prefix if present
+	model = strings.TrimPrefix(model, "anthropic/")
+	fmt.Printf("  ✓ Model: %s\n", model)
+
+	// Step 4: Derive Anthropic base URL
+	anthropicBaseURL := strings.Replace(cfg.BaseURL, "/llm/v1", "/v1", 1)
+
+	// Step 5: Launch Claude Code with HPP environment
+	fmt.Println()
+	fmt.Println("  Starting Claude Code with HPP...")
+	fmt.Println()
+
+	cmd := exec.Command(claudePath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(),
+		"ANTHROPIC_BASE_URL="+anthropicBaseURL,
+		"ANTHROPIC_API_KEY="+cfg.APIKey,
+		"ANTHROPIC_DEFAULT_SONNET_MODEL="+model,
+		"ANTHROPIC_DEFAULT_HAIKU_MODEL="+model,
+		"ANTHROPIC_DEFAULT_OPUS_MODEL="+model,
+		"CLAUDE_CODE_SUBAGENT_MODEL="+model,
+	)
+	return cmd.Run()
+}
+
+func findClaude() (string, error) {
+	if p, err := exec.LookPath("claude"); err == nil {
+		return p, nil
+	}
+	// Check common install locations
+	home, _ := os.UserHomeDir()
+	name := "claude"
+	if runtime.GOOS == "windows" {
+		name = "claude.exe"
+	}
+	fallback := filepath.Join(home, ".claude", "local", name)
+	if _, err := os.Stat(fallback); err == nil {
+		return fallback, nil
+	}
+	return "", fmt.Errorf("claude not found")
+}
+
+func installClaude() error {
+	fmt.Println("  Installing Claude Code...")
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		cmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	case "windows":
+		cmd := exec.Command("powershell", "-Command", "irm https://claude.ai/install.ps1 | iex")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	default:
+		return fmt.Errorf("automatic install not supported on %s.\nInstall from https://code.claude.com/docs/en/quickstart", runtime.GOOS)
+	}
+}
+
+func promptYesNo(question string) bool {
+	fmt.Printf("%s (Y/n): ", question)
+	var answer string
+	fmt.Scanln(&answer)
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	return answer == "" || answer == "y" || answer == "yes"
 }
 
 // ─── setup ──────────────────────────────────────────────────

@@ -324,13 +324,19 @@ func setupTelegram() error {
 	}
 
 	// Step 6: Restart gateway
-	fmt.Println("  Restarting gateway...")
-	if err := openclaw.RunCommand("gateway", "restart"); err != nil {
-		fmt.Printf("  ⚠ Gateway restart failed: %s\n", err)
-		fmt.Println("  Try manually: openclaw gateway restart")
-		return nil
+	if runtime.GOOS == "windows" {
+		fmt.Println()
+		fmt.Println("  To apply changes, start the gateway in a new terminal:")
+		fmt.Println("    openclaw gateway")
+	} else {
+		fmt.Println("  Restarting gateway...")
+		if err := openclaw.RunCommand("gateway", "restart"); err != nil {
+			fmt.Printf("  ⚠ Gateway restart failed: %s\n", err)
+			fmt.Println("  Try manually: openclaw gateway restart")
+			return nil
+		}
+		fmt.Println("  ✓ Gateway restarted")
 	}
-	fmt.Println("  ✓ Gateway restarted")
 
 	// Step 7: Health check
 	fmt.Println("  Checking connection...")

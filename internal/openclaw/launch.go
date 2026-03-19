@@ -253,27 +253,51 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 		providers = make(map[string]interface{})
 	}
 
-	// Fetch model list for context window info
+	// Fetch model list and split by provider type
 	apiModels, _ := api.ListModels(cfg.BaseURL, cfg.APIKey)
-	var modelEntries []map[string]interface{}
+	var openaiModels []map[string]interface{}
+	var anthropicModels []map[string]interface{}
 	for _, m := range apiModels {
 		entry := map[string]interface{}{
 			"id":   m.ID,
 			"name": m.ID,
 		}
-		modelEntries = append(modelEntries, entry)
+		if strings.HasPrefix(m.ID, "anthropic/") {
+			// Strip prefix for Anthropic native API (model ID without "anthropic/")
+			entry["id"] = strings.TrimPrefix(m.ID, "anthropic/")
+			entry["name"] = m.ID
+			anthropicModels = append(anthropicModels, entry)
+		} else {
+			openaiModels = append(openaiModels, entry)
+		}
 	}
 
+	// Derive Anthropic base URL from OpenAI base URL
+	// e.g., "https://router.hpp.io/llm/v1" → "https://router.hpp.io/v1"
+	anthropicBaseURL := strings.Replace(cfg.BaseURL, "/llm/v1", "/v1", 1)
+
+	// hpp provider — OpenAI-compatible models
 	providers["hpp"] = map[string]interface{}{
 		"baseUrl": cfg.BaseURL,
 		"apiKey":  cfg.APIKey,
 		"api":     "openai-completions",
-		"models":  modelEntries,
+		"models":  openaiModels,
 	}
+
+	// hpp-anthropic provider — Anthropic native API models
+	if len(anthropicModels) > 0 {
+		providers["hpp-anthropic"] = map[string]interface{}{
+			"baseUrl": anthropicBaseURL,
+			"apiKey":  cfg.APIKey,
+			"api":     "anthropic-messages",
+			"models":  anthropicModels,
+		}
+	}
+
 	models["providers"] = providers
 	clawConfig["models"] = models
 
-	// Set default model
+	// Set default model with correct provider prefix
 	agents, ok := clawConfig["agents"].(map[string]interface{})
 	if !ok {
 		agents = make(map[string]interface{})
@@ -282,8 +306,12 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 	if !ok {
 		defaults = make(map[string]interface{})
 	}
+	defaultPrimary := "hpp/" + model
+	if strings.HasPrefix(model, "anthropic/") {
+		defaultPrimary = "hpp-anthropic/" + strings.TrimPrefix(model, "anthropic/")
+	}
 	defaults["model"] = map[string]interface{}{
-		"primary": "hpp/" + model,
+		"primary": defaultPrimary,
 	}
 	agents["defaults"] = defaults
 	clawConfig["agents"] = agents

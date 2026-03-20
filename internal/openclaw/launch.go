@@ -335,7 +335,7 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath, output, 0644)
+	return os.WriteFile(configPath, output, 0600)
 }
 
 // validateOpenClawConfig runs openclaw config validate

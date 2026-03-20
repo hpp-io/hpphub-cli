@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -87,15 +88,21 @@ func PollForToken(hubURL string, deviceCode string, interval int, timeout int) (
 }
 
 // OpenBrowser opens a URL in the default browser
-func OpenBrowser(url string) error {
+func OpenBrowser(rawURL string) error {
+	// Validate URL to prevent command injection
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		return fmt.Errorf("invalid URL scheme: %s", rawURL)
+	}
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", url)
+		cmd = exec.Command("open", rawURL)
 	case "linux":
-		cmd = exec.Command("xdg-open", url)
+		cmd = exec.Command("xdg-open", rawURL)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
+		// Use rundll32 instead of cmd /c start to avoid shell metacharacter injection
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL)
 	default:
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}

@@ -1,247 +1,143 @@
 # hpphub
 
-HPP Hub CLI — connect [OpenClaw](https://openclaw.ai/) to [HPP Hub](https://hub.hpp.io) with a single command.
+HPP Hub CLI — connect AI tools to [HPP Hub](https://hub.hpp.io) with a single command.
 
 ```bash
-hpphub launch openclaw
+hpphub launch openclaw      # OpenClaw (AI assistant)
+hpphub launch claude        # Claude Code (coding agent)
 ```
-
-Like `ollama launch openclaw` connects OpenClaw to local models, `hpphub launch openclaw` connects OpenClaw to HPP's cloud models.
 
 ## Install
 
-### One-line install (macOS / Linux)
-
+**macOS / Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.sh | sudo bash
 ```
 
-This detects your OS and architecture, downloads the latest binary from [GitHub Releases](https://github.com/hpp-io/hpphub-cli/releases), and installs it to `/usr/local/bin/hpphub`.
-
-### Windows (PowerShell)
-
+**Windows (PowerShell):**
 ```powershell
 irm https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.ps1 | iex
 ```
 
-> **Note:** If you see an Execution Policy error, run this first:
-> ```powershell
-> Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-> ```
-> After installation, **restart the terminal** for PATH to take effect.
+> If you see an Execution Policy error, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` first.
+> After installation, restart the terminal for PATH to take effect.
 
-On Windows, the OpenClaw gateway runs in foreground mode. Keep the terminal open while using Telegram/WhatsApp channels.
-
-### Windows (WSL2) — Recommended
-
-WSL2 provides the best experience on Windows (background gateway, full compatibility):
-
+**Windows (WSL2) — Recommended:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hpp-io/hpphub-cli/main/install.sh | sudo bash
 ```
 
-### Build from source (Go 1.24+)
-
+**Build from source (Go 1.24+):**
 ```bash
-git clone https://github.com/hpp-io/hpphub-cli.git
-cd hpphub-cli
+git clone https://github.com/hpp-io/hpphub-cli.git && cd hpphub-cli
 go build -o hpphub ./cmd/hpphub/
 ```
 
-## Getting Started
+## Quick Start
 
-### For New Users (no HPP Hub account)
-
-If you don't have an HPP Hub account yet, `hpphub` will guide you through the entire process:
+### OpenClaw — AI assistant on your messaging apps
 
 ```bash
-$ hpphub launch openclaw
+hpphub launch openclaw
 ```
 
-**Step 1 — OpenClaw Installation**
-
-```
-Checking OpenClaw installation...
-  ✗ OpenClaw not found
-  Install OpenClaw? (Y/n): Y
-  Installing OpenClaw...
-  ✓ OpenClaw detected
-```
-
-If OpenClaw is already installed, this step is skipped automatically.
-
-> OpenClaw requires Node.js 22+. If Node.js is not installed, the OpenClaw installer will handle it.
-
-**Step 2 — HPP Hub Login**
-
-```
-Not logged in. Starting login flow...
-  Your code: ABCD-1234
-  Browser opened. Enter the code and authorize.
-  Waiting for approval...
-```
-
-A browser window opens to `hub.hpp.io`. Since you don't have an account:
-
-1. Click **Sign in with Google** (or your preferred login method)
-2. Complete the sign-up process:
-   - Agree to Terms of Service
-   - A wallet and API credentials are automatically created for you
-3. After sign-up, you are redirected to the **Authorize Device** page
-4. Enter the code shown in your terminal (e.g., `ABCD-1234`)
-5. Click **Authorize**
-
-![Authorize Device](https://github.com/user-attachments/assets/d7134077-5e1b-4cb9-b599-bca35dcd97f6)
-
-```
-  ✓ Logged in as you@example.com
-  ✓ API key saved: ...xxxx
-```
-
-**Step 3 — Model Selection**
-
-```
-  Available models:
-   1. anthropic/claude-sonnet-4-6          ($3.00/$15.00 per M tokens)
-   2. openai/gpt-5-mini                    ($0.25/$2.00 per M tokens)
-   ...
-  Select model (number): 2
-```
-
-Or skip with `--model`:
+### Claude Code — AI coding agent in your terminal
 
 ```bash
-hpphub launch openclaw --model openai/gpt-5-mini
+hpphub launch claude
 ```
 
-**Step 4 — Done**
+Both commands handle everything automatically — install, login, configure, and start. Already logged in? It skips straight to setup.
 
-```
-  ✓ HPP provider configured in OpenClaw
-  ✓ OpenClaw gateway running
-
-You're all set! Send a message via Telegram, WhatsApp, or other connected channels.
-```
-
-### For Existing Users (already have an HPP Hub account)
-
-```bash
-$ hpphub launch openclaw
-```
-
-The flow is the same, but faster — no sign-up needed:
-
-1. Browser opens → log in with your existing account
-2. Enter the code → Authorize
-3. Your existing API key is reused (no duplicate keys)
-4. Select a model → OpenClaw configured and running
-
-If you've already run `hpphub launch openclaw` before, your login and API key are cached in `~/.hpphub/config.json`. Running the command again will skip login and go straight to configuration.
+See [How It Works](#how-it-works) for the full flow.
 
 ## Commands
 
-```bash
-hpphub launch openclaw              # Full setup: install → login → configure → start
-hpphub launch openclaw --config     # Configure only, don't start gateway
-hpphub launch openclaw --model <m>  # Use a specific model
-
-hpphub login                        # Log in to HPP Hub
-hpphub logout                       # Log out
-hpphub whoami                       # Show current login status
-
-hpphub models                       # List available models with pricing
-
-hpphub setup telegram               # Set up Telegram bot connection
-
-hpphub uninstall                    # Remove hpphub and its configuration
-```
-
-## Available Models
-
-After login, `hpphub models` shows all available models:
-
-```
-PROVIDER     MODEL                                           INPUT     OUTPUT
-──────────────────────────────────────────────────────────────────────────────
-anthropic    anthropic/claude-sonnet-4-6                   $3.00/M   $15.00/M
-openai       openai/gpt-5-mini                             $0.15/M    $0.60/M
-openai       openai/gpt-5                                  $1.25/M   $10.00/M
-...
-```
+| Command | Description |
+|---------|-------------|
+| `hpphub launch openclaw` | Install + login + configure + start OpenClaw with HPP |
+| `hpphub launch openclaw --model <m>` | Same as above, with a specific model (skip selection prompt) |
+| `hpphub launch openclaw --config` | Update OpenClaw settings only (useful for changing model without restarting) |
+| `hpphub launch claude` | Install + login + launch Claude Code with HPP |
+| `hpphub login` | Log in to HPP Hub |
+| `hpphub logout` | Log out |
+| `hpphub whoami` | Show current login status |
+| `hpphub models` | List available models with pricing |
+| `hpphub setup telegram` | Connect a Telegram bot to OpenClaw |
+| `hpphub uninstall` | Remove hpphub and its configuration |
 
 ## How It Works
 
-```
-hpphub launch openclaw
-       │
-       ├─ OpenClaw installed? → detect or auto-install
-       ├─ Logged in? → Device Code Flow (browser-based)
-       ├─ API key? → auto-create on login
-       ├─ Model? → interactive selection or --model flag
-       ├─ Configure OpenClaw → inject HPP provider into ~/.openclaw/openclaw.json
-       └─ Start gateway → openclaw gateway start
-```
-
-After setup, OpenClaw routes messages through HPP:
-
-```
-Telegram/WhatsApp/Slack → OpenClaw → HPP Hub (router.hpp.io) → LLM → response
-```
-
-## Authentication
-
-`hpphub login` uses [Device Code Flow (RFC 8628)](https://datatracker.ietf.org/doc/html/rfc8628):
+### OpenClaw — AI assistant on your messaging apps
 
 ```bash
-$ hpphub login
-  Your code: ABCD-1234
+$ hpphub launch openclaw
+
+Checking OpenClaw installation...
+  ✓ OpenClaw detected                     # auto-installs if missing
+
+Not logged in. Starting login flow...
+  Your code: ABCD-1234                     # enter this code in the browser
   Browser opened. Enter the code and authorize.
-  Waiting for approval...
-  ✓ Logged in as user@example.com
-  ✓ API key saved: ...a3f2
 ```
 
-Works in all environments including WSL and SSH sessions.
+![Authorize Device](docs/images/authorize-device.png)
 
-Credentials are stored in `~/.hpphub/config.json`.
+```
+  ✓ Logged in as you@example.com
+  ✓ API key saved
 
-## Configuration
+  Available models:
+   1. anthropic/claude-sonnet-4-6          ($3.00/$15.00 per M tokens)
+   2. openai/gpt-5-mini                    ($0.25/$2.00 per M tokens)
+  Select model (number): 2                 # pick a model
 
-### CLI config
-
-Stored at `~/.hpphub/config.json` after login:
-
-```json
-{
-  "api_key": "hpph_...",
-  "base_url": "https://router.hpp.io/llm/v1",
-  "email": "user@example.com"
-}
+  ✓ HPP provider configured in OpenClaw
+  ✓ OpenClaw gateway running               # ready to use
 ```
 
-### OpenClaw config
+Now send a message to your bot on Telegram, WhatsApp, or Slack — it responds using your chosen HPP model.
 
-`hpphub launch openclaw` adds HPP as a provider in `~/.openclaw/openclaw.json`:
+### Claude Code — AI coding agent in your terminal
 
-```json
-{
-  "models": {
-    "mode": "merge",
-    "providers": {
-      "hpp": {
-        "baseUrl": "https://router.hpp.io/llm/v1",
-        "apiKey": "hpph_...",
-        "api": "openai-completions",
-        "models": [...]
-      }
-    }
-  }
-}
+First time (not logged in yet):
+
+```bash
+$ hpphub launch claude
+
+Checking Claude Code installation...
+  ✓ Claude Code detected                  # auto-installs if missing
+
+Not logged in. Starting login flow...
+  Your code: WXYZ-5678                     # same Device Code Flow as OpenClaw
+  Browser opened. Enter the code and authorize.
+  ✓ Logged in as you@example.com
+  ✓ API key saved
+  ✓ Model: claude-sonnet-4-6
+
+  Starting Claude Code with HPP...
+
+$ claude >                                 # Claude Code prompt, powered by HPP
 ```
 
-## After Setup
+Already logged in (via any previous `hpphub` command):
 
-### Connect Telegram
+```bash
+$ hpphub launch claude
+
+Checking Claude Code installation...
+  ✓ Claude Code detected
+  ✓ Logged in as you@example.com           # login skipped
+  ✓ Model: claude-sonnet-4-6
+
+  Starting Claude Code with HPP...
+
+$ claude >
+```
+
+## OpenClaw — Telegram Setup
+
+After `hpphub launch openclaw`, connect a Telegram bot:
 
 ```bash
 $ hpphub setup telegram
@@ -262,37 +158,29 @@ $ hpphub setup telegram
   ✓ Telegram bot connected!
 ```
 
-Send a message to your bot in Telegram — it should respond using HPP models.
-
-### Connect Other Channels
-
+Other channels (WhatsApp, Discord, Slack, etc.):
 ```bash
-# Interactive setup for WhatsApp, Discord, Slack, Signal, etc.
 openclaw configure --section channels
 ```
 
-### Change Model
+## Configuration
 
-```bash
-hpphub launch openclaw --config --model anthropic/claude-sonnet-4-6
+**CLI config** — `~/.hpphub/config.json`:
+```json
+{
+  "api_key": "hpph_...",
+  "base_url": "https://router.hpp.io/llm/v1",
+  "email": "user@example.com"
+}
 ```
 
-### Manage
+**OpenClaw config** — `~/.openclaw/openclaw.json` (auto-generated by `hpphub launch openclaw`)
 
-```bash
-# Check gateway status
-openclaw health
+## Windows Notes
 
-# Stop the gateway
-openclaw gateway stop
-
-# View logs
-tail -f ~/.openclaw/logs/gateway.log
-
-# Re-login with a different account
-hpphub logout
-hpphub login
-```
+- **Gateway**: Runs in foreground on Windows native. Keep the terminal open for Telegram/WhatsApp. WSL2 supports background mode.
+- **Execution Policy**: May need `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` before install.
+- **Terminal restart**: Required after install for PATH to take effect.
 
 ## License
 

@@ -300,7 +300,9 @@ func launchClaude(model string, hubURL string) error {
 	fmt.Printf("  ✓ Model: %s\n", model)
 
 	// Step 4: Derive Anthropic base URL
-	anthropicBaseURL := strings.Replace(cfg.BaseURL, "/llm/v1", "/v1", 1)
+	// Claude Code appends /v1/messages itself, so base URL should not include /v1
+	// e.g., "https://router.hpp.io/llm/v1" → "https://router.hpp.io"
+	anthropicBaseURL := strings.Replace(cfg.BaseURL, "/llm/v1", "", 1)
 
 	// Step 5: Launch Claude Code with HPP environment
 	fmt.Println()

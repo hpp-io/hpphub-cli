@@ -226,7 +226,12 @@ func launchCmd() *cobra.Command {
 			case "openclaw":
 				return openclaw.Launch(model, configOnly, hubURL)
 			case "claude":
-				return launchClaude(model, hubURL)
+				persist, _ := cmd.Flags().GetBool("persist")
+				unpersist, _ := cmd.Flags().GetBool("unpersist")
+				if unpersist {
+					return unpersistClaudeConfig()
+				}
+				return launchClaude(model, hubURL, persist)
 			default:
 				return fmt.Errorf("unknown integration: %s\nAvailable: openclaw, claude", integration)
 			}
@@ -236,13 +241,15 @@ func launchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&model, "model", "", "Model to use (skip interactive selection)")
 	cmd.Flags().BoolVar(&configOnly, "config", false, "Configure only, don't start")
 	cmd.Flags().StringVar(&hubURL, "hub-url", "", "Hub URL (default: https://hub.hpp.io)")
+	cmd.Flags().Bool("persist", false, "Save HPP settings to shell profile (claude works without hpphub)")
+	cmd.Flags().Bool("unpersist", false, "Remove HPP settings from shell profile")
 
 	return cmd
 }
 
 // ─── launch claude ──────────────────────────────────────────
 
-func launchClaude(model string, hubURL string) error {
+func launchClaude(model string, hubURL string, persist bool) error {
 	// Step 1: Check Claude Code
 	fmt.Println("Checking Claude Code installation...")
 	claudePath, err := findClaude()
@@ -304,7 +311,11 @@ func launchClaude(model string, hubURL string) error {
 	// e.g., "https://router.hpp.io/llm/v1" → "https://router.hpp.io"
 	anthropicBaseURL := strings.Replace(cfg.BaseURL, "/llm/v1", "", 1)
 
-	// Step 5: Launch Claude Code with HPP environment
+	// Step 5: Persist or launch
+	if persist {
+		return persistClaudeConfig(anthropicBaseURL, cfg.APIKey, model)
+	}
+
 	fmt.Println()
 	fmt.Println("  Starting Claude Code with HPP...")
 	fmt.Println()
@@ -322,6 +333,136 @@ func launchClaude(model string, hubURL string) error {
 		"CLAUDE_CODE_SUBAGENT_MODEL="+model,
 	)
 	return cmd.Run()
+}
+
+func persistClaudeConfig(baseURL, apiKey, model string) error {
+	home, _ := os.UserHomeDir()
+
+	// Detect shell profile
+	shell := os.Getenv("SHELL")
+	var profilePath string
+	switch {
+	case strings.Contains(shell, "zsh"):
+		profilePath = filepath.Join(home, ".zshrc")
+	case strings.Contains(shell, "bash"):
+		profilePath = filepath.Join(home, ".bashrc")
+	default:
+		if runtime.GOOS == "windows" {
+			// Windows PowerShell profile
+			profilePath = filepath.Join(home, "Documents", "WindowsPowerShell", "Microsoft.PowerShell_profile.ps1")
+		} else {
+			profilePath = filepath.Join(home, ".bashrc")
+		}
+	}
+
+	marker := "# hpphub claude config"
+	var lines []string
+
+	if runtime.GOOS == "windows" {
+		lines = []string{
+			marker,
+			fmt.Sprintf(`$env:ANTHROPIC_BASE_URL = "%s"`, baseURL),
+			fmt.Sprintf(`$env:ANTHROPIC_API_KEY = "%s"`, apiKey),
+			fmt.Sprintf(`$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "%s"`, model),
+			fmt.Sprintf(`$env:ANTHROPIC_DEFAULT_HAIKU_MODEL = "%s"`, model),
+			fmt.Sprintf(`$env:ANTHROPIC_DEFAULT_OPUS_MODEL = "%s"`, model),
+			fmt.Sprintf(`$env:CLAUDE_CODE_SUBAGENT_MODEL = "%s"`, model),
+			"# end hpphub claude config",
+		}
+	} else {
+		lines = []string{
+			marker,
+			fmt.Sprintf(`export ANTHROPIC_BASE_URL="%s"`, baseURL),
+			fmt.Sprintf(`export ANTHROPIC_API_KEY="%s"`, apiKey),
+			fmt.Sprintf(`export ANTHROPIC_DEFAULT_SONNET_MODEL="%s"`, model),
+			fmt.Sprintf(`export ANTHROPIC_DEFAULT_HAIKU_MODEL="%s"`, model),
+			fmt.Sprintf(`export ANTHROPIC_DEFAULT_OPUS_MODEL="%s"`, model),
+			fmt.Sprintf(`export CLAUDE_CODE_SUBAGENT_MODEL="%s"`, model),
+			"# end hpphub claude config",
+		}
+	}
+
+	block := strings.Join(lines, "\n") + "\n"
+
+	// Read existing profile
+	existing, _ := os.ReadFile(profilePath)
+	content := string(existing)
+
+	// Remove old config if exists
+	if idx := strings.Index(content, marker); idx >= 0 {
+		endMarker := "# end hpphub claude config"
+		if endIdx := strings.Index(content[idx:], endMarker); endIdx >= 0 {
+			content = content[:idx] + content[idx+endIdx+len(endMarker)+1:]
+		}
+	}
+
+	// Append new config
+	content = strings.TrimRight(content, "\n") + "\n\n" + block
+
+	if err := os.MkdirAll(filepath.Dir(profilePath), 0700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(profilePath, []byte(content), 0600); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Printf("  ✓ HPP settings saved to %s\n", profilePath)
+	fmt.Println()
+	fmt.Println("  Restart your terminal, then just run:")
+	fmt.Println("    claude")
+	fmt.Println()
+	fmt.Println("  To remove, run:")
+	fmt.Println("    hpphub launch claude --unpersist")
+
+	return nil
+}
+
+func unpersistClaudeConfig() error {
+	home, _ := os.UserHomeDir()
+	shell := os.Getenv("SHELL")
+	var profilePath string
+	switch {
+	case strings.Contains(shell, "zsh"):
+		profilePath = filepath.Join(home, ".zshrc")
+	case strings.Contains(shell, "bash"):
+		profilePath = filepath.Join(home, ".bashrc")
+	default:
+		if runtime.GOOS == "windows" {
+			profilePath = filepath.Join(home, "Documents", "WindowsPowerShell", "Microsoft.PowerShell_profile.ps1")
+		} else {
+			profilePath = filepath.Join(home, ".bashrc")
+		}
+	}
+
+	existing, err := os.ReadFile(profilePath)
+	if err != nil {
+		return fmt.Errorf("could not read %s: %w", profilePath, err)
+	}
+
+	content := string(existing)
+	marker := "# hpphub claude config"
+	endMarker := "# end hpphub claude config"
+
+	idx := strings.Index(content, marker)
+	if idx < 0 {
+		fmt.Println("  No HPP settings found in shell profile.")
+		return nil
+	}
+
+	endIdx := strings.Index(content[idx:], endMarker)
+	if endIdx >= 0 {
+		content = content[:idx] + content[idx+endIdx+len(endMarker)+1:]
+	}
+
+	content = strings.TrimRight(content, "\n") + "\n"
+	if err := os.WriteFile(profilePath, []byte(content), 0600); err != nil {
+		return err
+	}
+
+	fmt.Printf("  ✓ HPP settings removed from %s\n", profilePath)
+	fmt.Println("  Restart your terminal to apply.")
+	return nil
 }
 
 func findClaude() (string, error) {

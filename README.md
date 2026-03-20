@@ -47,6 +47,16 @@ hpphub launch openclaw
 hpphub launch claude
 ```
 
+To use `claude` directly without `hpphub` every time:
+
+```bash
+hpphub launch claude --persist    # saves HPP settings to your shell profile
+# restart terminal, then just run:
+claude
+
+hpphub launch claude --unpersist  # removes HPP settings from shell profile
+```
+
 Both commands handle everything automatically — install, login, configure, and start. Already logged in? It skips straight to setup.
 
 See [How It Works](#how-it-works) for the full flow.
@@ -59,6 +69,8 @@ See [How It Works](#how-it-works) for the full flow.
 | `hpphub launch openclaw --model <m>` | Same as above, with a specific model (skip selection prompt) |
 | `hpphub launch openclaw --config` | Update OpenClaw settings only (useful for changing model without restarting) |
 | `hpphub launch claude` | Install + login + launch Claude Code with HPP |
+| `hpphub launch claude --persist` | Save HPP settings to shell profile (run `claude` directly after) |
+| `hpphub launch claude --unpersist` | Remove HPP settings from shell profile |
 | `hpphub login` | Log in to HPP Hub |
 | `hpphub logout` | Log out |
 | `hpphub whoami` | Show current login status |

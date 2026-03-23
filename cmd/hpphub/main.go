@@ -475,9 +475,14 @@ func findClaude() (string, error) {
 	if runtime.GOOS == "windows" {
 		name = "claude.exe"
 	}
-	fallback := filepath.Join(home, ".claude", "local", name)
-	if _, err := os.Stat(fallback); err == nil {
-		return fallback, nil
+	candidates := []string{
+		filepath.Join(home, ".claude", "local", name),
+		filepath.Join(home, ".local", "bin", name),
+	}
+	for _, path := range candidates {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
 	}
 	return "", fmt.Errorf("claude not found")
 }

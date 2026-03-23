@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -67,42 +68,49 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 		fmt.Printf("  ✓ API key: ...%s\n", suffix)
 	}
 
-	// Step 3: Model selection
-	selectedModel := modelFlag
-	if selectedModel == "" {
-		models, err := api.ListModels(cfg.BaseURL, cfg.APIKey)
-		if err != nil {
-			return fmt.Errorf("failed to list models: %w", err)
-		}
-		if len(models) == 0 {
-			return fmt.Errorf("no models available")
-		}
+	// Step 3: Check if already configured
+	alreadyConfigured := isHPPConfigured()
 
-		// Filter text models (exclude image models)
-		var textModels []api.Model
-		for _, m := range models {
-			if !strings.Contains(m.ID, "dall-e") && !strings.Contains(m.ID, "image") {
-				textModels = append(textModels, m)
+	if alreadyConfigured && modelFlag == "" {
+		// Already set up, no model change requested
+		currentModel := getCurrentModel()
+		fmt.Printf("  ✓ HPP already configured (model: %s)\n", currentModel)
+	} else {
+		// Need to configure or reconfigure
+		selectedModel := modelFlag
+		if selectedModel == "" {
+			models, err := api.ListModels(cfg.BaseURL, cfg.APIKey)
+			if err != nil {
+				return fmt.Errorf("failed to list models: %w", err)
+			}
+			if len(models) == 0 {
+				return fmt.Errorf("no models available")
+			}
+
+			// Filter text models (exclude image models)
+			var textModels []api.Model
+			for _, m := range models {
+				if !strings.Contains(m.ID, "dall-e") && !strings.Contains(m.ID, "image") {
+					textModels = append(textModels, m)
+				}
+			}
+
+			selectedModel = selectModel(textModels)
+			if selectedModel == "" {
+				return fmt.Errorf("no model selected")
 			}
 		}
+		fmt.Printf("  ✓ Model: %s\n", selectedModel)
 
-		selectedModel = selectModel(textModels)
-		if selectedModel == "" {
-			return fmt.Errorf("no model selected")
+		fmt.Println("  Configuring OpenClaw...")
+		if err := configureOpenClaw(cfg, selectedModel); err != nil {
+			return fmt.Errorf("failed to configure: %w", err)
 		}
-	}
-	fmt.Printf("  ✓ Model: %s\n", selectedModel)
+		fmt.Println("  ✓ HPP provider configured in OpenClaw")
 
-	// Step 4: Configure OpenClaw
-	fmt.Println("  Configuring OpenClaw...")
-	if err := configureOpenClaw(cfg, selectedModel); err != nil {
-		return fmt.Errorf("failed to configure: %w", err)
-	}
-	fmt.Println("  ✓ HPP provider configured in OpenClaw")
-
-	// Validate config
-	if err := validateOpenClawConfig(); err != nil {
-		fmt.Printf("  ⚠ Config validation: %s\n", err)
+		if err := validateOpenClawConfig(); err != nil {
+			fmt.Printf("  ⚠ Config validation: %s\n", err)
+		}
 	}
 
 	if configOnly {
@@ -112,24 +120,40 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 	}
 
 	// Step 5: Ask about Telegram setup (before starting gateway)
-	if !isTelegramConfigured() {
+	telegramWasConfigured := isTelegramConfigured()
+	if !telegramWasConfigured {
 		fmt.Println()
 		if promptYesNo("  Set up Telegram bot?") {
 			SetupTelegram()
 		}
 	}
+	telegramChanged := !telegramWasConfigured && isTelegramConfigured()
 
-	// Step 6: Start OpenClaw
-	fmt.Println("  Starting OpenClaw gateway...")
-	if err := startOpenClaw(); err != nil {
-		fmt.Printf("  ⚠ Failed to start gateway: %s\n", err)
-		if runtime.GOOS == "windows" {
-			fmt.Println("  Start manually in a new terminal: openclaw gateway")
+	// Step 6: Start or restart Gateway
+	if isGatewayRunning() {
+		if telegramChanged {
+			fmt.Println("  Restarting gateway to apply Telegram settings...")
+			if runtime.GOOS == "windows" {
+				fmt.Println("  ⚠ Please restart the gateway manually (Ctrl+C in gateway terminal, then run 'openclaw gateway' again)")
+			} else {
+				_ = RunCommand("gateway", "restart")
+				fmt.Println("  ✓ Gateway restarted")
+			}
 		} else {
-			fmt.Println("  Start manually: openclaw gateway start")
+			fmt.Println("  ✓ Gateway already running")
 		}
 	} else {
-		fmt.Println("  ✓ OpenClaw gateway running")
+		fmt.Println("  Starting OpenClaw gateway...")
+		if err := startOpenClaw(); err != nil {
+			fmt.Printf("  ⚠ Failed to start gateway: %s\n", err)
+			if runtime.GOOS == "windows" {
+				fmt.Println("  Start manually in a new terminal: openclaw gateway")
+			} else {
+				fmt.Println("  Start manually: openclaw gateway start")
+			}
+		} else {
+			fmt.Println("  ✓ OpenClaw gateway running")
+		}
 	}
 
 	fmt.Println()
@@ -368,12 +392,37 @@ func validateOpenClawConfig() error {
 func startOpenClaw() error {
 	if runtime.GOOS == "windows" {
 		// Windows: run gateway in foreground (daemon not supported)
+		// Ensure child process is killed on Ctrl+C
 		fmt.Println("  Starting gateway in foreground (press Ctrl+C to stop)...")
 		cmd := exec.Command("openclaw", "gateway")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		return cmd.Run()
+
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+
+		// Handle Ctrl+C — kill child process
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt)
+
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		select {
+		case <-sigChan:
+			// Ctrl+C received — kill child process
+			if cmd.Process != nil {
+				cmd.Process.Kill()
+			}
+			fmt.Println("\n  Gateway stopped.")
+			return nil
+		case err := <-done:
+			return err
+		}
 	}
 	// macOS/Linux: start as daemon
 	cmd := exec.Command("openclaw", "gateway", "start")
@@ -393,6 +442,52 @@ func isWSL() bool {
 	}
 	lower := strings.ToLower(string(data))
 	return strings.Contains(lower, "microsoft") || strings.Contains(lower, "wsl")
+}
+
+// isHPPConfigured checks if HPP provider is already set up in OpenClaw config
+func isHPPConfigured() bool {
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".openclaw", "openclaw.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	var cfg map[string]interface{}
+	if json.Unmarshal(data, &cfg) != nil {
+		return false
+	}
+	models, _ := cfg["models"].(map[string]interface{})
+	providers, _ := models["providers"].(map[string]interface{})
+	hpp, _ := providers["hpp"].(map[string]interface{})
+	return hpp["apiKey"] != nil
+}
+
+// getCurrentModel returns the current default model from OpenClaw config
+func getCurrentModel() string {
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".openclaw", "openclaw.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return "unknown"
+	}
+	var cfg map[string]interface{}
+	if json.Unmarshal(data, &cfg) != nil {
+		return "unknown"
+	}
+	agents, _ := cfg["agents"].(map[string]interface{})
+	defaults, _ := agents["defaults"].(map[string]interface{})
+	model, _ := defaults["model"].(map[string]interface{})
+	primary, _ := model["primary"].(string)
+	if primary == "" {
+		return "unknown"
+	}
+	return primary
+}
+
+// isGatewayRunning checks if OpenClaw gateway is already running
+func isGatewayRunning() bool {
+	cmd := exec.Command("openclaw", "health")
+	return cmd.Run() == nil
 }
 
 // isTelegramConfigured checks if Telegram is already set up in OpenClaw config

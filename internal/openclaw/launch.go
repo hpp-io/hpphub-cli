@@ -112,9 +112,11 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 	}
 
 	// Step 5: Ask about Telegram setup (before starting gateway)
-	fmt.Println()
-	if promptYesNo("  Connect Telegram?") {
-		SetupTelegram()
+	if !isTelegramConfigured() {
+		fmt.Println()
+		if promptYesNo("  Set up Telegram bot?") {
+			SetupTelegram()
+		}
 	}
 
 	// Step 6: Start OpenClaw
@@ -391,6 +393,24 @@ func isWSL() bool {
 	}
 	lower := strings.ToLower(string(data))
 	return strings.Contains(lower, "microsoft") || strings.Contains(lower, "wsl")
+}
+
+// isTelegramConfigured checks if Telegram is already set up in OpenClaw config
+func isTelegramConfigured() bool {
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".openclaw", "openclaw.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	var cfg map[string]interface{}
+	if json.Unmarshal(data, &cfg) != nil {
+		return false
+	}
+	channels, _ := cfg["channels"].(map[string]interface{})
+	telegram, _ := channels["telegram"].(map[string]interface{})
+	token, _ := telegram["botToken"].(string)
+	return token != ""
 }
 
 // SetupTelegram handles Telegram bot configuration

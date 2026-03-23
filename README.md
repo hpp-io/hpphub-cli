@@ -110,6 +110,22 @@ Not logged in. Starting login flow...
 
 Now send a message to your bot on Telegram, WhatsApp, or Slack — it responds using your chosen HPP model.
 
+Re-running `hpphub launch openclaw` when already configured skips setup and starts the gateway directly:
+
+```bash
+$ hpphub launch openclaw
+
+  ✓ OpenClaw detected
+  ✓ Logged in as you@example.com
+  ✓ HPP already configured (model: hpp/openai/gpt-5-mini)
+  ✓ Gateway already running
+```
+
+To change model, use `--model`:
+```bash
+hpphub launch openclaw --model anthropic/claude-sonnet-4-6
+```
+
 ### Claude Code — AI coding agent in your terminal
 
 First time (not logged in yet):

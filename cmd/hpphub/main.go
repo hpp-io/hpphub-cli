@@ -538,71 +538,15 @@ func setupCmd() *cobra.Command {
 }
 
 func setupTelegram() error {
-	// Step 1: Check OpenClaw
+	// Check OpenClaw
 	if _, err := openclaw.DetectOpenClaw(); err != nil {
 		return fmt.Errorf("OpenClaw is not installed. Run 'hpphub launch openclaw' first")
 	}
 
-	// Step 2: Guide
-	fmt.Println()
-	fmt.Println("  To create a Telegram bot:")
-	fmt.Println()
-	fmt.Println("  1. Open Telegram and talk to @BotFather")
-	fmt.Println("  2. Send /newbot and follow the steps")
-	fmt.Println("  3. Copy the bot token")
-	fmt.Println()
+	// Run Telegram setup
+	openclaw.SetupTelegram()
 
-	// Step 3: Token input
-	fmt.Print("  Paste your Telegram bot token: ")
-	var token string
-	if _, err := fmt.Scanln(&token); err != nil || token == "" {
-		return fmt.Errorf("no token provided")
-	}
-	token = strings.TrimSpace(token)
-
-	// Step 4: Set token in OpenClaw
-	fmt.Println("  Configuring Telegram...")
-	if err := openclaw.RunCommand("config", "set", "channels.telegram.botToken", token); err != nil {
-		return fmt.Errorf("failed to set bot token: %w", err)
-	}
-	fmt.Println("  ✓ Bot token saved")
-
-	// Step 5: User ID (optional but recommended)
-	fmt.Println()
-	fmt.Println("  To restrict who can use the bot, enter your Telegram user ID.")
-	fmt.Println("  (Get it from @userinfobot in Telegram)")
-	fmt.Println()
-	fmt.Print("  Your Telegram user ID (or press Enter to skip): ")
-	var userID string
-	fmt.Scanln(&userID)
-	userID = strings.TrimSpace(userID)
-
-	if userID != "" {
-		// Validate: must be numeric
-		isNumeric := true
-		for _, c := range userID {
-			if c < '0' || c > '9' {
-				isNumeric = false
-				break
-			}
-		}
-		if !isNumeric {
-			fmt.Println("  ⚠ Telegram user ID must be a number (e.g., 8228669492)")
-			fmt.Println("    Get it from @userinfobot in Telegram")
-			fmt.Println("  Skipped — bot will use pairing mode")
-		} else {
-			allowFrom := fmt.Sprintf(`["%s"]`, userID)
-			if err := openclaw.RunCommand("config", "set", "channels.telegram.allowFrom", allowFrom); err != nil {
-				fmt.Printf("  ⚠ Failed to set allowFrom: %s\n", err)
-			} else {
-				fmt.Println("  ✓ Access restricted to your account")
-			}
-		}
-	} else {
-		fmt.Println("  ⚠ Skipped — bot will use pairing mode (new users need approval)")
-	}
-
-	// Step 6: Restart gateway
+	// Restart gateway or guide
 	if runtime.GOOS == "windows" {
 		fmt.Println()
 		fmt.Println("  To apply changes, start the gateway in a new terminal:")
@@ -617,7 +561,7 @@ func setupTelegram() error {
 		fmt.Println("  ✓ Gateway restarted")
 	}
 
-	// Step 7: Health check
+	// Health check
 	fmt.Println("  Checking connection...")
 	if err := openclaw.RunCommand("health"); err != nil {
 		fmt.Printf("  ⚠ Health check: %s\n", err)

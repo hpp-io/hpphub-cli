@@ -110,11 +110,21 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 		return nil
 	}
 
-	// Step 5: Start OpenClaw
+	// Step 5: Ask about Telegram setup (before starting gateway)
+	fmt.Println()
+	if promptYesNo("  Connect Telegram?") {
+		SetupTelegram()
+	}
+
+	// Step 6: Start OpenClaw
 	fmt.Println("  Starting OpenClaw gateway...")
 	if err := startOpenClaw(); err != nil {
 		fmt.Printf("  ⚠ Failed to start gateway: %s\n", err)
-		fmt.Println("  You can start it manually: openclaw gateway start")
+		if runtime.GOOS == "windows" {
+			fmt.Println("  Start manually in a new terminal: openclaw gateway")
+		} else {
+			fmt.Println("  Start manually: openclaw gateway start")
+		}
 	} else {
 		fmt.Println("  ✓ OpenClaw gateway running")
 	}
@@ -377,6 +387,65 @@ func isWSL() bool {
 	}
 	lower := strings.ToLower(string(data))
 	return strings.Contains(lower, "microsoft") || strings.Contains(lower, "wsl")
+}
+
+// SetupTelegram handles Telegram bot configuration
+func SetupTelegram() {
+	fmt.Println()
+	fmt.Println("  To create a Telegram bot:")
+	fmt.Println()
+	fmt.Println("  1. Open Telegram and talk to @BotFather")
+	fmt.Println("  2. Send /newbot and follow the steps")
+	fmt.Println("  3. Copy the bot token")
+	fmt.Println()
+
+	fmt.Print("  Paste your Telegram bot token: ")
+	var token string
+	if _, err := fmt.Scanln(&token); err != nil || token == "" {
+		fmt.Println("  ⚠ No token provided, skipping Telegram setup")
+		return
+	}
+	token = strings.TrimSpace(token)
+
+	fmt.Println("  Configuring Telegram...")
+	if err := RunCommand("config", "set", "channels.telegram.botToken", token); err != nil {
+		fmt.Printf("  ⚠ Failed to set bot token: %s\n", err)
+		return
+	}
+	fmt.Println("  ✓ Bot token saved")
+
+	fmt.Println()
+	fmt.Println("  To restrict who can use the bot, enter your Telegram user ID.")
+	fmt.Println("  (Get it from @userinfobot in Telegram)")
+	fmt.Println()
+	fmt.Print("  Your Telegram user ID (or press Enter to skip): ")
+	var userID string
+	fmt.Scanln(&userID)
+	userID = strings.TrimSpace(userID)
+
+	if userID != "" {
+		isNumeric := true
+		for _, c := range userID {
+			if c < '0' || c > '9' {
+				isNumeric = false
+				break
+			}
+		}
+		if !isNumeric {
+			fmt.Println("  ⚠ Telegram user ID must be a number (e.g., 8228669492)")
+			fmt.Println("    Get it from @userinfobot in Telegram")
+			fmt.Println("  Skipped — bot will use pairing mode")
+		} else {
+			allowFrom := fmt.Sprintf(`["%s"]`, userID)
+			if err := RunCommand("config", "set", "channels.telegram.allowFrom", allowFrom); err != nil {
+				fmt.Printf("  ⚠ Failed to set allowFrom: %s\n", err)
+			} else {
+				fmt.Println("  ✓ Access restricted to your account")
+			}
+		}
+	} else {
+		fmt.Println("  ⚠ Skipped — bot will use pairing mode (new users need approval)")
+	}
 }
 
 // RunCommand runs an openclaw CLI command

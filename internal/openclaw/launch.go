@@ -1,6 +1,7 @@
 package openclaw
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -459,8 +460,8 @@ func RunCommand(args ...string) error {
 // promptYesNo asks a yes/no question
 func promptYesNo(question string) bool {
 	fmt.Printf("%s (Y/n): ", question)
-	var answer string
-	fmt.Scanln(&answer)
+	reader := bufio.NewReader(os.Stdin)
+	answer, _ := reader.ReadString('\n')
 	answer = strings.ToLower(strings.TrimSpace(answer))
 	return answer == "" || answer == "y" || answer == "yes"
 }

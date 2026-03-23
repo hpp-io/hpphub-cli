@@ -230,8 +230,11 @@ func selectModel(models []api.Model) string {
 	fmt.Println()
 	fmt.Print("  Select model (number): ")
 
+	reader := bufio.NewReader(os.Stdin)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimSpace(line)
 	var choice int
-	if _, err := fmt.Scanf("%d", &choice); err != nil || choice < 1 || choice > len(models) {
+	if _, err := fmt.Sscanf(line, "%d", &choice); err != nil || choice < 1 || choice > len(models) {
 		return ""
 	}
 
@@ -401,12 +404,13 @@ func SetupTelegram() {
 	fmt.Println()
 
 	fmt.Print("  Paste your Telegram bot token: ")
-	var token string
-	if _, err := fmt.Scanln(&token); err != nil || token == "" {
+	reader := bufio.NewReader(os.Stdin)
+	token, _ := reader.ReadString('\n')
+	token = strings.TrimSpace(token)
+	if token == "" {
 		fmt.Println("  ⚠ No token provided, skipping Telegram setup")
 		return
 	}
-	token = strings.TrimSpace(token)
 
 	fmt.Println("  Configuring Telegram...")
 	if err := RunCommand("config", "set", "channels.telegram.botToken", token); err != nil {
@@ -420,8 +424,8 @@ func SetupTelegram() {
 	fmt.Println("  (Get it from @userinfobot in Telegram)")
 	fmt.Println()
 	fmt.Print("  Your Telegram user ID (or press Enter to skip): ")
-	var userID string
-	fmt.Scanln(&userID)
+	reader2 := bufio.NewReader(os.Stdin)
+	userID, _ := reader2.ReadString('\n')
 	userID = strings.TrimSpace(userID)
 
 	if userID != "" {

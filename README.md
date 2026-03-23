@@ -105,6 +105,11 @@ Not logged in. Starting login flow...
   Select model (number): 2                 # pick a model
 
   ✓ HPP provider configured in OpenClaw
+
+  Set up Telegram bot? (Y/n): Y            # optional — connect Telegram
+  Paste your Telegram bot token: ...
+  ✓ Bot token saved
+
   ✓ OpenClaw gateway running               # ready to use
 ```
 
@@ -165,7 +170,7 @@ $ claude >
 
 ## OpenClaw — Telegram Setup
 
-After `hpphub launch openclaw`, connect a Telegram bot:
+Telegram setup is offered during `hpphub launch openclaw`. You can also run it separately:
 
 ```bash
 $ hpphub setup telegram

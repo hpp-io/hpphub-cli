@@ -113,6 +113,11 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 		}
 	}
 
+	// Run non-interactive onboard if not yet done (registers daemon, etc.)
+	if !isOnboarded() {
+		runNonInteractiveOnboard()
+	}
+
 	if configOnly {
 		fmt.Println()
 		fmt.Println("Configuration complete. Run 'openclaw gateway start' to start.")
@@ -179,14 +184,14 @@ func installOpenClaw() error {
 
 	switch runtime.GOOS {
 	case "darwin", "linux":
-		cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | bash")
+		cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | OPENCLAW_NO_ONBOARD=1 bash -s -- --no-onboard")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	case "windows":
 		if isWSL() {
-			cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | bash")
+			cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | OPENCLAW_NO_ONBOARD=1 bash -s -- --no-onboard")
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
@@ -482,6 +487,61 @@ func getCurrentModel() string {
 		return "unknown"
 	}
 	return primary
+}
+
+// isOnboarded checks if OpenClaw onboarding was completed
+func isOnboarded() bool {
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".openclaw", "openclaw.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false
+	}
+	var cfg map[string]interface{}
+	if json.Unmarshal(data, &cfg) != nil {
+		return false
+	}
+	wizard, _ := cfg["wizard"].(map[string]interface{})
+	if wizard == nil {
+		return false
+	}
+	lastRunAt, _ := wizard["lastRunAt"].(string)
+	return lastRunAt != ""
+}
+
+// runNonInteractiveOnboard runs openclaw onboard in non-interactive mode
+func runNonInteractiveOnboard() {
+	fmt.Println("  Setting up OpenClaw daemon...")
+	args := []string{
+		"onboard",
+		"--non-interactive",
+		"--accept-risk",
+		"--skip-channels",
+		"--skip-skills",
+	}
+	if canInstallDaemon() {
+		args = append(args, "--install-daemon")
+	} else {
+		args = append(args, "--skip-health")
+	}
+	cmd := exec.Command("openclaw", args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("  ⚠ Onboard: %s\n", err)
+	} else {
+		fmt.Println("  ✓ OpenClaw daemon registered")
+	}
+}
+
+// canInstallDaemon checks if daemon can be installed (Linux needs systemd)
+func canInstallDaemon() bool {
+	if runtime.GOOS != "linux" {
+		return true
+	}
+	fi, err := os.Stat("/run/systemd/system")
+	return err == nil && fi.IsDir()
 }
 
 // isGatewayRunning checks if OpenClaw gateway is already running

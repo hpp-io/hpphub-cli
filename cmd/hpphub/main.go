@@ -361,6 +361,7 @@ func persistClaudeConfig(baseURL, apiKey, model string) error {
 	if runtime.GOOS == "windows" {
 		lines = []string{
 			marker,
+			`if (-not ($env:PATH -like "*$env:USERPROFILE\.local\bin*")) { $env:PATH += ";$env:USERPROFILE\.local\bin" }`,
 			fmt.Sprintf(`$env:ANTHROPIC_BASE_URL = "%s"`, baseURL),
 			fmt.Sprintf(`$env:ANTHROPIC_API_KEY = "%s"`, apiKey),
 			fmt.Sprintf(`$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "%s"`, model),
@@ -372,6 +373,7 @@ func persistClaudeConfig(baseURL, apiKey, model string) error {
 	} else {
 		lines = []string{
 			marker,
+			`[[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$PATH:$HOME/.local/bin"`,
 			fmt.Sprintf(`export ANTHROPIC_BASE_URL="%s"`, baseURL),
 			fmt.Sprintf(`export ANTHROPIC_API_KEY="%s"`, apiKey),
 			fmt.Sprintf(`export ANTHROPIC_DEFAULT_SONNET_MODEL="%s"`, model),

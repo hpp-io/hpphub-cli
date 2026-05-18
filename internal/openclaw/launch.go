@@ -352,13 +352,37 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 	if !ok {
 		defaults = make(map[string]interface{})
 	}
-	defaultPrimary := "hpp/" + model
-	if strings.HasPrefix(model, "anthropic/") {
-		defaultPrimary = "hpp-anthropic/" + strings.TrimPrefix(model, "anthropic/")
-	}
 	defaults["model"] = map[string]interface{}{
-		"primary": defaultPrimary,
+		"primary": providerPrefixedID(model),
 	}
+
+	// Heartbeat fires every 30m by default on the primary model — set
+	// cheap defaults so idle gateways don't burn credits. Skip if the
+	// user has already customized this block.
+	if existing, _ := defaults["heartbeat"].(map[string]interface{}); len(existing) == 0 {
+		hb := map[string]interface{}{
+			"every":           "2h",
+			"lightContext":    true,
+			"isolatedSession": true,
+			"activeHours": map[string]interface{}{
+				"start":    "09:00",
+				"end":      "22:00",
+				"timezone": detectSystemTimezone(),
+			},
+		}
+		if hbModel := pickHeartbeatModel(apiModels); hbModel != "" {
+			hb["model"] = hbModel
+			tag := "cost-optimized"
+			if isFreeModel(apiModels, hbModel) {
+				tag = "free"
+			}
+			fmt.Printf("  ✓ Heartbeat: every 2h on %s (%s)\n", hbModel, tag)
+		} else {
+			fmt.Println("  ✓ Heartbeat: every 2h, lightContext, isolated session")
+		}
+		defaults["heartbeat"] = hb
+	}
+
 	agents["defaults"] = defaults
 	clawConfig["agents"] = agents
 
@@ -381,6 +405,94 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 		return err
 	}
 	return os.WriteFile(configPath, output, 0600)
+}
+
+// providerPrefixedID returns a model ID with the OpenClaw provider prefix
+// matching the convention used in configureOpenClaw.
+func providerPrefixedID(modelID string) string {
+	if strings.HasPrefix(modelID, "anthropic/") {
+		return "hpp-anthropic/" + strings.TrimPrefix(modelID, "anthropic/")
+	}
+	return "hpp/" + modelID
+}
+
+// pickHeartbeatModel returns a cost-effective model for the heartbeat poll,
+// prefixed for OpenClaw provider routing. Prefers the free Ollama model
+// served by the HPP router, then known-cheap paid IDs, then the lowest-
+// priced available model.
+func pickHeartbeatModel(apiModels []api.Model) string {
+	if len(apiModels) == 0 {
+		return ""
+	}
+	preferOrder := []string{
+		"ollama/gpt-oss:120b",
+		"openai/gpt-5-nano",
+		"openai/gpt-4o-mini",
+		"openai/gpt-4.1-nano",
+		"openai/gpt-4.1-mini",
+		"anthropic/claude-haiku-4-5-20251001",
+	}
+	byID := make(map[string]api.Model, len(apiModels))
+	for _, m := range apiModels {
+		byID[m.ID] = m
+	}
+	for _, id := range preferOrder {
+		if m, ok := byID[id]; ok {
+			return providerPrefixedID(m.ID)
+		}
+	}
+	var best *api.Model
+	bestCost := -1.0
+	for i := range apiModels {
+		m := &apiModels[i]
+		if strings.Contains(m.ID, "dall-e") || strings.Contains(m.ID, "image") {
+			continue
+		}
+		cost := 0.0
+		if m.Pricing != nil {
+			cost = m.Pricing.Input + m.Pricing.Output
+		}
+		if best == nil || cost < bestCost {
+			best = m
+			bestCost = cost
+		}
+	}
+	if best == nil {
+		return ""
+	}
+	return providerPrefixedID(best.ID)
+}
+
+// isFreeModel reports whether the given provider-prefixed model ID maps to
+// a router model with zero input/output pricing.
+func isFreeModel(apiModels []api.Model, prefixedID string) bool {
+	for _, m := range apiModels {
+		if providerPrefixedID(m.ID) != prefixedID {
+			continue
+		}
+		return m.Pricing != nil && m.Pricing.Input == 0 && m.Pricing.Output == 0
+	}
+	return false
+}
+
+// detectSystemTimezone returns an IANA timezone name for the host, falling
+// back to "UTC" when detection fails (e.g., Windows or non-standard layouts).
+func detectSystemTimezone() string {
+	if link, err := os.Readlink("/etc/localtime"); err == nil {
+		const marker = "/zoneinfo/"
+		if idx := strings.Index(link, marker); idx >= 0 {
+			return link[idx+len(marker):]
+		}
+	}
+	if data, err := os.ReadFile("/etc/timezone"); err == nil {
+		if tz := strings.TrimSpace(string(data)); tz != "" {
+			return tz
+		}
+	}
+	if tz := os.Getenv("TZ"); tz != "" {
+		return tz
+	}
+	return "UTC"
 }
 
 // validateOpenClawConfig runs openclaw config validate

@@ -182,30 +182,90 @@ func DetectOpenClaw() (string, error) {
 func installOpenClaw() error {
 	fmt.Println("  Installing OpenClaw...")
 
+	var runErr error
 	switch runtime.GOOS {
 	case "darwin", "linux":
 		cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | OPENCLAW_NO_ONBOARD=1 bash -s -- --no-onboard")
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		return cmd.Run()
+		runErr = cmd.Run()
 	case "windows":
 		if isWSL() {
 			cmd := exec.Command("bash", "-c", "curl -fsSL https://openclaw.ai/install.sh | OPENCLAW_NO_ONBOARD=1 bash -s -- --no-onboard")
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
-			return cmd.Run()
+			runErr = cmd.Run()
+		} else {
+			cmd := exec.Command("powershell", "-Command", "iwr -useb https://openclaw.ai/install.ps1 | iex")
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			runErr = cmd.Run()
 		}
-		cmd := exec.Command("powershell", "-Command", "iwr -useb https://openclaw.ai/install.ps1 | iex")
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
 	default:
 		return fmt.Errorf("automatic install not supported on %s.\n"+
 			"Install from https://docs.openclaw.ai/install and rerun hpphub launch openclaw", runtime.GOOS)
 	}
+	if runErr != nil {
+		return runErr
+	}
+	// Install may upgrade Node into a directory that isn't first in PATH
+	// (e.g., NodeSource lands /usr/bin/node while shell prefers older
+	// /usr/local/bin/node). openclaw's #!/usr/bin/env node shebang then
+	// resolves to the old binary and rejects with "Node.js v22.12+ is
+	// required". Prepend a directory that satisfies the requirement.
+	preferUsableNodeInPath()
+	return nil
+}
+
+// preferUsableNodeInPath prepends a directory containing a Node binary
+// satisfying OpenClaw's minimum (v22.12+) to PATH, if such a directory
+// isn't already first. No-op when no suitable Node is found or on Windows
+// where Node lookup follows different conventions.
+func preferUsableNodeInPath() {
+	if runtime.GOOS == "windows" {
+		return
+	}
+	const minMaj, minMin = 22, 12
+	candidates := []string{
+		"/usr/bin/node",
+		"/usr/local/bin/node",
+		"/opt/homebrew/bin/node",
+		"/snap/bin/node",
+	}
+	for _, p := range candidates {
+		if !nodeAtLeast(p, minMaj, minMin) {
+			continue
+		}
+		dir := filepath.Dir(p)
+		path := os.Getenv("PATH")
+		sep := string(os.PathListSeparator)
+		if path == dir || strings.HasPrefix(path, dir+sep) {
+			return
+		}
+		os.Setenv("PATH", dir+sep+path)
+		return
+	}
+}
+
+// nodeAtLeast reports whether the binary at path is a Node executable with
+// version >= minMaj.minMin.
+func nodeAtLeast(path string, minMaj, minMin int) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	out, err := exec.Command(path, "--version").Output()
+	if err != nil {
+		return false
+	}
+	var maj, min int
+	if _, err := fmt.Sscanf(strings.TrimSpace(string(out)), "v%d.%d.", &maj, &min); err != nil {
+		return false
+	}
+	return maj > minMaj || (maj == minMaj && min >= minMin)
 }
 
 // runLogin performs the Device Code Flow login

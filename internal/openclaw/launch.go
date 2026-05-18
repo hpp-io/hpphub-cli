@@ -75,6 +75,9 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 		// Already set up, no model change requested
 		currentModel := getCurrentModel()
 		fmt.Printf("  ✓ HPP already configured (model: %s)\n", currentModel)
+		if err := ensureHeartbeatDefaults(cfg); err != nil {
+			fmt.Printf("  ⚠ Heartbeat backfill: %s\n", err)
+		}
 	} else {
 		// Need to configure or reconfigure
 		selectedModel := modelFlag
@@ -420,26 +423,8 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 	// cheap defaults so idle gateways don't burn credits. Skip if the
 	// user has already customized this block.
 	if existing, _ := defaults["heartbeat"].(map[string]interface{}); len(existing) == 0 {
-		hb := map[string]interface{}{
-			"every":           "2h",
-			"lightContext":    true,
-			"isolatedSession": true,
-			"activeHours": map[string]interface{}{
-				"start":    "09:00",
-				"end":      "22:00",
-				"timezone": detectSystemTimezone(),
-			},
-		}
-		if hbModel := pickHeartbeatModel(apiModels); hbModel != "" {
-			hb["model"] = hbModel
-			tag := "cost-optimized"
-			if isFreeModel(apiModels, hbModel) {
-				tag = "free"
-			}
-			fmt.Printf("  ✓ Heartbeat: every 2h on %s (%s)\n", hbModel, tag)
-		} else {
-			fmt.Println("  ✓ Heartbeat: every 2h, lightContext, isolated session")
-		}
+		hb, summary := buildHeartbeatDefaults(apiModels)
+		fmt.Printf("  ✓ Heartbeat: %s\n", summary)
 		defaults["heartbeat"] = hb
 	}
 
@@ -465,6 +450,73 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 		return err
 	}
 	return os.WriteFile(configPath, output, 0600)
+}
+
+// buildHeartbeatDefaults returns the cost-optimized heartbeat block to
+// inject into agents.defaults, along with a one-line summary suitable for
+// console output.
+func buildHeartbeatDefaults(apiModels []api.Model) (map[string]interface{}, string) {
+	hb := map[string]interface{}{
+		"every":           "2h",
+		"lightContext":    true,
+		"isolatedSession": true,
+		"activeHours": map[string]interface{}{
+			"start":    "09:00",
+			"end":      "22:00",
+			"timezone": detectSystemTimezone(),
+		},
+	}
+	summary := "every 2h, lightContext, isolated session"
+	if hbModel := pickHeartbeatModel(apiModels); hbModel != "" {
+		hb["model"] = hbModel
+		tag := "cost-optimized"
+		if isFreeModel(apiModels, hbModel) {
+			tag = "free"
+		}
+		summary = fmt.Sprintf("every 2h on %s (%s)", hbModel, tag)
+	}
+	return hb, summary
+}
+
+// ensureHeartbeatDefaults backfills the heartbeat block for previously-
+// configured users who never had it set, so they stop burning credits on
+// the 30-minute primary-model poll. Preserves any user customization.
+func ensureHeartbeatDefaults(cfg *config.Config) error {
+	home, _ := os.UserHomeDir()
+	configPath := filepath.Join(home, ".openclaw", "openclaw.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil
+	}
+	var clawConfig map[string]interface{}
+	if err := json.Unmarshal(data, &clawConfig); err != nil {
+		return err
+	}
+	agents, _ := clawConfig["agents"].(map[string]interface{})
+	if agents == nil {
+		agents = make(map[string]interface{})
+	}
+	defaults, _ := agents["defaults"].(map[string]interface{})
+	if defaults == nil {
+		defaults = make(map[string]interface{})
+	}
+	if existing, _ := defaults["heartbeat"].(map[string]interface{}); len(existing) > 0 {
+		return nil
+	}
+	apiModels, _ := api.ListModels(cfg.BaseURL, cfg.APIKey)
+	hb, summary := buildHeartbeatDefaults(apiModels)
+	defaults["heartbeat"] = hb
+	agents["defaults"] = defaults
+	clawConfig["agents"] = agents
+	output, err := json.MarshalIndent(clawConfig, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(configPath, output, 0600); err != nil {
+		return err
+	}
+	fmt.Printf("  ✓ Heartbeat backfilled: %s\n", summary)
+	return nil
 }
 
 // providerPrefixedID returns a model ID with the OpenClaw provider prefix

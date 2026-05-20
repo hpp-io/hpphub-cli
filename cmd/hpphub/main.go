@@ -103,10 +103,9 @@ func loginCmd() *cobra.Command {
 			}
 
 			fmt.Println()
-			fmt.Printf("  ✓ Logged in as %s\n", token.Email)
-			if token.APIKey != "" {
-				suffix := token.APIKey[len(token.APIKey)-4:]
-				fmt.Printf("  ✓ API key saved: ...%s\n", suffix)
+			openclaw.PrintAccountSummary(cfg)
+			if err := openclaw.SyncOpenClawCredentialsWithMessage(cfg); err != nil {
+				fmt.Printf("  ⚠ %s\n", err)
 			}
 
 			return nil
@@ -159,6 +158,14 @@ func whoamiCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Printf("Logged in as %s\n", cfg.Email)
+			fmt.Printf("Hub:    %s\n", cfg.GetHubURL())
+			if cfg.BaseURL != "" {
+				fmt.Printf("Router: %s\n", cfg.BaseURL)
+			}
+			if cfg.APIKey != "" {
+				suffix := cfg.APIKey[len(cfg.APIKey)-4:]
+				fmt.Printf("API key: ...%s\n", suffix)
+			}
 			return nil
 		},
 	}

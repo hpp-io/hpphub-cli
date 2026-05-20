@@ -60,12 +60,11 @@ func Launch(modelFlag string, configOnly bool, hubURL string) error {
 			return err
 		}
 	} else {
-		fmt.Printf("  ✓ Logged in as %s\n", cfg.Email)
+		PrintAccountSummary(cfg)
 	}
 
-	if cfg.APIKey != "" {
-		suffix := cfg.APIKey[len(cfg.APIKey)-4:]
-		fmt.Printf("  ✓ API key: ...%s\n", suffix)
+	if err := SyncOpenClawCredentialsWithMessage(cfg); err != nil {
+		fmt.Printf("  ⚠ %s\n", err)
 	}
 
 	// Step 3: Check if already configured
@@ -305,7 +304,10 @@ func RunLogin(cfg *config.Config) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	fmt.Printf("  ✓ Logged in as %s\n", token.Email)
+	PrintAccountSummary(cfg)
+	if err := SyncOpenClawCredentialsWithMessage(cfg); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -367,17 +369,10 @@ func configureOpenClaw(cfg *config.Config, model string) error {
 	var openaiModels []map[string]interface{}
 	var anthropicModels []map[string]interface{}
 	for _, m := range apiModels {
-		entry := map[string]interface{}{
-			"id":   m.ID,
-			"name": m.ID,
-		}
 		if strings.HasPrefix(m.ID, "anthropic/") {
-			// Strip prefix for Anthropic native API (model ID without "anthropic/")
-			entry["id"] = strings.TrimPrefix(m.ID, "anthropic/")
-			entry["name"] = m.ID
-			anthropicModels = append(anthropicModels, entry)
+			anthropicModels = append(anthropicModels, buildModelEntry(m))
 		} else {
-			openaiModels = append(openaiModels, entry)
+			openaiModels = append(openaiModels, buildModelEntry(m))
 		}
 	}
 
